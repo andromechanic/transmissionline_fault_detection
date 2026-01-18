@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transmission Line Fault Detection - Dual Node</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<style>
+  body { 
+    font-family: 'Courier New', monospace;
+    background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+  }
+  .electric-glow {
+    text-shadow: 0 0 10px rgba(250,204,21,0.8),
+                 0 0 20px rgba(250,204,21,0.4);
+  }
+  .danger-glow {
+    animation: dangerPulse 1.5s infinite;
+  }
+  @keyframes dangerPulse {
+    0%,100% { box-shadow: 0 0 20px rgba(239,68,68,0.6); }
+    50% { box-shadow: 0 0 40px rgba(239,68,68,0.9); }
+  }
+  .alert-enter { animation: alertSlideIn 0.5s ease-out; }
+  .alert-exit { animation: alertSlideOut 0.5s ease-in; }
+
+  @keyframes alertSlideIn {
+    from { transform: translateY(-100%); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes alertSlideOut {
+    from { transform: translateY(0); opacity: 1; }
+    to   { transform: translateY(-100%); opacity: 0; }
+  }
+  
+  .meter-bar {
+    transition: width 0.3s ease;
+  }
+</style>
+</head>
+
+<body class="min-h-screen text-slate-200 p-6">
+
+<!-- HEADER -->
+<div class="max-w-7xl mx-auto mb-6 border-2 border-yellow-500/40 rounded-xl p-4 bg-slate-900/60">
+  <div class="flex justify-between items-center">
+    <div>
+      <h1 class="text-3xl font-extrabold text-yellow-400 electric-glow">
+        ⚡ TRANSMISSION LINE FAULT DETECTION - DUAL NODE
+      </h1>
+      <p class="text-sm text-slate-300">Live AI-Based Grid Monitoring System</p>
+    </div>
+    <div class="text-right text-sm">
+      <p>Status:
+        <span id="systemStatus" class="text-green-400 font-bold">INITIALIZING</span>
+      </p>
+      <p>FPS: <span id="fps" class="text-cyan-400 font-bold">--</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- ALERT -->
+<div id="alertBanner" class="fixed top-0 left-0 right-0 z-50 hidden"></div>
+
+<!-- MAIN -->
+<div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+<!-- LEFT -->
+<div class="lg:col-span-2 space-y-6">
+
+<!-- NODE 1 PARAMETERS -->
+<div class="bg-slate-900/80 border-2 border-cyan-500/40 rounded-xl p-5">
+  <h2 class="text-lg font-bold text-cyan-400 electric-glow mb-4">📍 NODE 1 - ELECTRICAL PARAMETERS</h2>
+  
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- Current Node 1 -->
+    <div class="bg-slate-950/60 rounded-lg p-4 border border-cyan-500/30">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs text-slate-400">CURRENT (C1)</span>
+        <span id="current1Status" class="text-xs font-bold text-green-400">NORMAL</span>
+      </div>
+      <div class="text-3xl font-bold text-cyan-300" id="current1Value">0.00 A</div>
+      <div class="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+        <div id="current1Bar" class="meter-bar h-full bg-cyan-500" style="width: 0%"></div>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">Threshold: &gt;2A (L-L Fault)</div>
+    </div>
+
+    <!-- Voltage Node 1 -->
+    <div class="bg-slate-950/60 rounded-lg p-4 border border-yellow-500/30">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs text-slate-400">VOLTAGE (V1)</span>
+        <span id="voltage1Status" class="text-xs font-bold text-green-400">NORMAL</span>
+      </div>
+      <div class="text-3xl font-bold text-yellow-300" id="voltage1Value">0.0 V</div>
+      <div class="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+        <div id="voltage1Bar" class="meter-bar h-full bg-yellow-500" style="width: 0%"></div>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">Alert: V=0 (Open Line)</div>
+    </div>
+
+    <!-- Temperature Node 1 -->
+    <div class="bg-slate-950/60 rounded-lg p-4 border border-orange-500/30">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs text-slate-400">TEMPERATURE (T1)</span>
+        <span id="temp1Status" class="text-xs font-bold text-green-400">NORMAL</span>
+      </div>
+      <div class="text-3xl font-bold text-orange-300" id="temp1Value">0.0 °C</div>
+      <div class="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+        <div id="temp1Bar" class="meter-bar h-full bg-orange-500" style="width: 0%"></div>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">Threshold: &gt;35°C (Insulator)</div>
+    </div>
+  </div>
+</div>
+
+<!-- NODE 2 PARAMETERS -->
+<div class="bg-slate-900/80 border-2 border-purple-500/40 rounded-xl p-5">
+  <h2 class="text-lg font-bold text-purple-400 electric-glow mb-4">📍 NODE 2 - ELECTRICAL PARAMETERS</h2>
+  
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <!-- Current Node 2 -->
+    <div class="bg-slate-950/60 rounded-lg p-4 border border-cyan-500/30">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs text-slate-400">CURRENT (C2)</span>
+        <span id="current2Status" class="text-xs font-bold text-green-400">NORMAL</span>
+      </div>
+      <div class="text-3xl font-bold text-cyan-300" id="current2Value">0.00 A</div>
+      <div class="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+        <div id="current2Bar" class="meter-bar h-full bg-cyan-500" style="width: 0%"></div>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">Threshold: &gt;2A (L-L Fault)</div>
+    </div>
+
+    <!-- Voltage Node 2 -->
+    <div class="bg-slate-950/60 rounded-lg p-4 border border-yellow-500/30">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs text-slate-400">VOLTAGE (V2)</span>
+        <span id="voltage2Status" class="text-xs font-bold text-green-400">NORMAL</span>
+      </div>
+      <div class="text-3xl font-bold text-yellow-300" id="voltage2Value">0.0 V</div>
+      <div class="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+        <div id="voltage2Bar" class="meter-bar h-full bg-yellow-500" style="width: 0%"></div>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">Alert: V=0 (Open Line)</div>
+    </div>
+
+    <!-- Temperature Node 2 -->
+    <div class="bg-slate-950/60 rounded-lg p-4 border border-orange-500/30">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs text-slate-400">TEMPERATURE (T2)</span>
+        <span id="temp2Status" class="text-xs font-bold text-green-400">NORMAL</span>
+      </div>
+      <div class="text-3xl font-bold text-orange-300" id="temp2Value">0.0 °C</div>
+      <div class="mt-2 bg-slate-800 rounded-full h-2 overflow-hidden">
+        <div id="temp2Bar" class="meter-bar h-full bg-orange-500" style="width: 0%"></div>
+      </div>
+      <div class="text-xs text-slate-500 mt-1">Threshold: &gt;35°C (Insulator)</div>
+    </div>
+  </div>
+</div>
+
+<!-- FAULT DIAGNOSIS -->
+<div class="bg-slate-900/80 border-2 border-red-500/40 rounded-xl p-5">
+  <h2 class="text-lg font-bold text-red-400 electric-glow mb-4">🔬 FAULT DIAGNOSIS</h2>
+  
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+    <!-- Line to Ground Fault -->
+    <div id="lineGroundCard" class="bg-slate-950/60 rounded-lg p-4 border-2 border-slate-600">
+      <div class="flex items-center space-x-3">
+        <div class="text-3xl">🌍</div>
+        <div class="flex-1">
+          <div class="text-sm font-bold text-slate-300">LINE-TO-GROUND</div>
+          <div id="lineGroundStatus" class="text-xs text-slate-500">Monitoring...</div>
+          <div id="lineGroundDetail" class="text-xs text-slate-400 mt-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Open Line Fault -->
+    <div id="openLineCard" class="bg-slate-950/60 rounded-lg p-4 border-2 border-slate-600">
+      <div class="flex items-center space-x-3">
+        <div class="text-3xl">🔌</div>
+        <div class="flex-1">
+          <div class="text-sm font-bold text-slate-300">OPEN LINE</div>
+          <div id="openLineStatus" class="text-xs text-slate-500">Monitoring...</div>
+          <div id="openLineDetail" class="text-xs text-slate-400 mt-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Line to Line Fault Node 1 -->
+    <div id="lineLine1Card" class="bg-slate-950/60 rounded-lg p-4 border-2 border-slate-600">
+      <div class="flex items-center space-x-3">
+        <div class="text-3xl">⚡</div>
+        <div class="flex-1">
+          <div class="text-sm font-bold text-slate-300">L-L FAULT (NODE 1)</div>
+          <div id="lineLine1Status" class="text-xs text-slate-500">Monitoring...</div>
+          <div id="lineLine1Detail" class="text-xs text-slate-400 mt-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Line to Line Fault Node 2 -->
+    <div id="lineLine2Card" class="bg-slate-950/60 rounded-lg p-4 border-2 border-slate-600">
+      <div class="flex items-center space-x-3">
+        <div class="text-3xl">⚡</div>
+        <div class="flex-1">
+          <div class="text-sm font-bold text-slate-300">L-L FAULT (NODE 2)</div>
+          <div id="lineLine2Status" class="text-xs text-slate-500">Monitoring...</div>
+          <div id="lineLine2Detail" class="text-xs text-slate-400 mt-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Insulator Fault Node 1 -->
+    <div id="insulator1Card" class="bg-slate-950/60 rounded-lg p-4 border-2 border-slate-600">
+      <div class="flex items-center space-x-3">
+        <div class="text-3xl">🔥</div>
+        <div class="flex-1">
+          <div class="text-sm font-bold text-slate-300">INSULATOR (NODE 1)</div>
+          <div id="insulator1Status" class="text-xs text-slate-500">Monitoring...</div>
+          <div id="insulator1Detail" class="text-xs text-slate-400 mt-1"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Insulator Fault Node 2 -->
+    <div id="insulator2Card" class="bg-slate-950/60 rounded-lg p-4 border-2 border-slate-600">
+      <div class="flex items-center space-x-3">
+        <div class="text-3xl">🔥</div>
+        <div class="flex-1">
+          <div class="text-sm font-bold text-slate-300">INSULATOR (NODE 2)</div>
+          <div id="insulator2Status" class="text-xs text-slate-500">Monitoring...</div>
+          <div id="insulator2Detail" class="text-xs text-slate-400 mt-1"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="faultDetails" class="mt-4 bg-slate-950/60 rounded-lg p-4 border border-slate-600 hidden">
+    <div class="text-sm font-bold text-red-400 mb-2">⚠ ACTIVE FAULTS</div>
+    <div id="faultDescription" class="text-xs text-slate-300"></div>
+  </div>
+</div>
+
+<div id="resultsCard" class="bg-slate-900/70 border-2 border-green-500/30 rounded-xl p-5">
+  <h2 class="text-lg font-bold text-yellow-400 electric-glow mb-3">🔍 DETECTION RESULTS</h2>
+  <div id="results">
+    <p class="text-green-400 font-bold">✔ No faults detected. System operating normally.</p>
+  </div>
+</div>
+
+<div class="bg-slate-900/80 border-2 border-yellow-500/40 rounded-xl p-5">
+  <h2 class="text-lg font-bold text-yellow-400 electric-glow mb-3">📡 LIVE CAMERA FEED</h2>
+  <img id="videoStream" src="/video_feed"
+       class="w-full rounded-md border-2 border-yellow-500/50">
+  <p class="mt-3 text-sm">
+    Detections:
+    <span id="detectionCount" class="text-cyan-400 font-bold">0</span>
+  </p>
+</div>
+
+</div>
+
+<!-- RIGHT -->
+<div class="space-y-6">
+<div class="bg-slate-900/80 border-2 border-yellow-500/40 rounded-xl p-5">
+  <h2 class="text-lg font-bold text-yellow-400 electric-glow mb-3">🧾 SYSTEM LOG</h2>
+  <div id="logs" class="bg-slate-950 rounded-md p-3 h-64 overflow-y-auto text-xs"></div>
+</div>
+
+<!-- Node Status -->
+<div class="bg-slate-900/80 border-2 border-blue-500/40 rounded-xl p-5">
+  <h2 class="text-lg font-bold text-blue-400 electric-glow mb-3">📊 NODE STATUS</h2>
+  
+  <div class="mb-4 pb-4 border-b border-slate-700">
+    <div class="text-sm font-bold text-cyan-400 mb-2">NODE 1</div>
+    <div class="space-y-1 text-xs">
+      <div class="flex justify-between">
+        <span class="text-slate-400">Last Update:</span>
+        <span id="node1LastUpdate" class="text-blue-300 font-mono">--</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-slate-400">Connection:</span>
+        <span id="node1Connection" class="text-yellow-400 font-bold">WAITING</span>
+      </div>
+    </div>
+  </div>
+  
+  <div>
+    <div class="text-sm font-bold text-purple-400 mb-2">NODE 2</div>
+    <div class="space-y-1 text-xs">
+      <div class="flex justify-between">
+        <span class="text-slate-400">Last Update:</span>
+        <span id="node2LastUpdate" class="text-blue-300 font-mono">--</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="text-slate-400">Connection:</span>
+        <span id="node2Connection" class="text-yellow-400 font-bold">WAITING</span>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+</div>
+
+<script>
+lucide.createIcons();
+
+const logs = document.getElementById("logs");
+const resultsDiv = document.getElementById("results");
+const resultsCard = document.getElementById("resultsCard");
+const systemStatus = document.getElementById("systemStatus");
+const detectionCountEl = document.getElementById("detectionCount");
+const fpsEl = document.getElementById("fps");
+const alertBanner = document.getElementById("alertBanner");
+
+// Node data storage
+let node1Data = { current: 0, voltage: 0, temp: 0 };
+let node2Data = { current: 0, voltage: 0, temp: 0 };
+
+let frameCount = 0;
+let lastTime = Date.now();
+let alertTimeout = null;
+let currentAlertState = false;
+let activeFaults = [];
+
+function log(msg, type="info") {
+  const t = new Date().toLocaleTimeString();
+  const c = type === "error" ? "text-red-400"
+          : type === "success" ? "text-green-400"
+          : type === "warning" ? "text-yellow-400"
+          : "text-slate-400";
+  logs.innerHTML += `<div class="${c}">[${t}] ${msg}</div>`;
+  logs.scrollTop = logs.scrollHeight;
+}
+
+function updateNodeDisplay(nodeNum, current, voltage, temp) {
+  const prefix = nodeNum === 1 ? "current1" : "current2";
+  const vPrefix = nodeNum === 1 ? "voltage1" : "voltage2";
+  const tPrefix = nodeNum === 1 ? "temp1" : "temp2";
+  
+  // Update current
+  document.getElementById(`${prefix}Value`).textContent = current.toFixed(2) + " A";
+  const currentPercent = Math.min((current / 5) * 100, 100);
+  document.getElementById(`${prefix}Bar`).style.width = currentPercent + "%";
+  
+  if (current > 2) {
+    document.getElementById(`${prefix}Status`).textContent = "HIGH";
+    document.getElementById(`${prefix}Status`).className = "text-xs font-bold text-red-400";
+    document.getElementById(`${prefix}Bar`).className = "meter-bar h-full bg-red-500";
+  } else if (current > 1) {
+    document.getElementById(`${prefix}Status`).textContent = "WARNING";
+    document.getElementById(`${prefix}Status`).className = "text-xs font-bold text-yellow-400";
+    document.getElementById(`${prefix}Bar`).className = "meter-bar h-full bg-yellow-500";
+  } else {
+    document.getElementById(`${prefix}Status`).textContent = "NORMAL";
+    document.getElementById(`${prefix}Status`).className = "text-xs font-bold text-green-400";
+    document.getElementById(`${prefix}Bar`).className = "meter-bar h-full bg-cyan-500";
+  }
+
+  // Update voltage
+  document.getElementById(`${vPrefix}Value`).textContent = voltage.toFixed(1) + " V";
+  const voltagePercent = Math.min((voltage / 250) * 100, 100);
+  document.getElementById(`${vPrefix}Bar`).style.width = voltagePercent + "%";
+  
+  if (voltage === 0) {
+    document.getElementById(`${vPrefix}Status`).textContent = "ZERO";
+    document.getElementById(`${vPrefix}Status`).className = "text-xs font-bold text-red-400";
+    document.getElementById(`${vPrefix}Bar`).className = "meter-bar h-full bg-red-500";
+  } else if (voltage < 180) {
+    document.getElementById(`${vPrefix}Status`).textContent = "LOW";
+    document.getElementById(`${vPrefix}Status`).className = "text-xs font-bold text-yellow-400";
+    document.getElementById(`${vPrefix}Bar`).className = "meter-bar h-full bg-yellow-500";
+  } else {
+    document.getElementById(`${vPrefix}Status`).textContent = "NORMAL";
+    document.getElementById(`${vPrefix}Status`).className = "text-xs font-bold text-green-400";
+    document.getElementById(`${vPrefix}Bar`).className = "meter-bar h-full bg-yellow-500";
+  }
+
+  // Update temperature
+  document.getElementById(`${tPrefix}Value`).textContent = temp.toFixed(1) + " °C";
+  const tempPercent = Math.min((temp / 100) * 100, 100);
+  document.getElementById(`${tPrefix}Bar`).style.width = tempPercent + "%";
+  
+  if (temp > 35) {
+    document.getElementById(`${tPrefix}Status`).textContent = "CRITICAL";
+    document.getElementById(`${tPrefix}Status`).className = "text-xs font-bold text-red-400";
+    document.getElementById(`${tPrefix}Bar`).className = "meter-bar h-full bg-red-500";
+  } else if (temp > 30) {
+    document.getElementById(`${tPrefix}Status`).textContent = "WARNING";
+    document.getElementById(`${tPrefix}Status`).className = "text-xs font-bold text-yellow-400";
+    document.getElementById(`${tPrefix}Bar`).className = "meter-bar h-full bg-yellow-500";
+  } else {
+    document.getElementById(`${tPrefix}Status`).textContent = "NORMAL";
+    document.getElementById(`${tPrefix}Status`).className = "text-xs font-bold text-green-400";
+    document.getElementById(`${tPrefix}Bar`).className = "meter-bar h-full bg-orange-500";
+  }
+}
+
+function resetFaultCard(cardId, statusId, detailId) {
+  document.getElementById(cardId).className = "bg-slate-950/60 rounded-lg p-4 border-2 border-slate-600";
+  document.getElementById(statusId).textContent = "Normal";
+  document.getElementById(statusId).className = "text-xs text-green-400";
+  document.getElementById(detailId).textContent = "";
+}
+
+function setFaultCard(cardId, statusId, detailId, statusText, detailText) {
+  document.getElementById(cardId).className = "bg-red-950/60 rounded-lg p-4 border-2 border-red-500 danger-glow";
+  document.getElementById(statusId).textContent = statusText;
+  document.getElementById(statusId).className = "text-xs text-red-400 font-bold";
+  document.getElementById(detailId).textContent = detailText;
+}
+
+function diagnoseFaults() {
+  activeFaults = [];
+  
+  const C1 = node1Data.current;
+  const C2 = node2Data.current;
+  const V1 = node1Data.voltage;
+  const V2 = node2Data.voltage;
+  const T1 = node1Data.temp;
+  const T2 = node2Data.temp;
+  
+  // Reset all cards
+  resetFaultCard("lineGroundCard", "lineGroundStatus", "lineGroundDetail");
+  resetFaultCard("openLineCard", "openLineStatus", "openLineDetail");
+  resetFaultCard("lineLine1Card", "lineLine1Status", "lineLine1Detail");
+  resetFaultCard("lineLine2Card", "lineLine2Status", "lineLine2Detail");
+  resetFaultCard("insulator1Card", "insulator1Status", "insulator1Detail");
+  resetFaultCard("insulator2Card", "insulator2Status", "insulator2Detail");
+  
+  // Fault 1: Line to Ground Fault (C1-C2 > 0.52)
+  const currentDiff = Math.abs(C1 - C2);
+  if (currentDiff > 0.52) {
+    setFaultCard(
+      "lineGroundCard", 
+      "lineGroundStatus", 
+      "lineGroundDetail",
+      "DETECTED!",
+      `ΔI = ${currentDiff.toFixed(2)}A`
+    );
+    activeFaults.push({
+      type: "Line-to-Ground Fault",
+      description: `Current difference between nodes: ${currentDiff.toFixed(2)}A (Threshold: >0.52A). Ground leakage detected.`,
+      severity: "CRITICAL",
+      values: `C1=${C1.toFixed(2)}A, C2=${C2.toFixed(2)}A`
+    });
+  }
+  
+  // Fault 2: Open Line Fault (V1=0 or V2=0)
+  if (V1 === 0 || V2 === 0) {
+    const faultNode = V1 === 0 ? "Node 1" : "Node 2";
+    setFaultCard(
+      "openLineCard",
+      "openLineStatus",
+      "openLineDetail",
+      "DETECTED!",
+      `${faultNode}: V=0`
+    );
+    activeFaults.push({
+      type: "Open Line Fault",
+      description: `Zero voltage detected at ${faultNode}. Line breakage or disconnection.`,
+      severity: "CRITICAL",
+      values: `V1=${V1.toFixed(1)}V, V2=${V2.toFixed(1)}V`
+    });
+  }
+  
+  // Fault 3: Line-to-Line Fault before Node 1 (C1 > 2)
+  if (C1 > 2) {
+    setFaultCard(
+      "lineLine1Card",
+      "lineLine1Status",
+      "lineLine1Detail",
+      "DETECTED!",
+      `C1=${C1.toFixed(2)}A`
+    );
+    activeFaults.push({
+      type: "Line-to-Line Fault (Node 1)",
+      description: `Excessive current at Node 1: ${C1.toFixed(2)}A (Threshold: >2A). Short circuit before Node 1.`,
+      severity: "CRITICAL",
+      values: `C1=${C1.toFixed(2)}A`
+    });
+  }
+  
+  // Fault 4: Line-to-Line Fault before Node 2 (C2 > 2)
+  if (C2 > 2) {
+    setFaultCard(
+      "lineLine2Card",
+      "lineLine2Status",
+      "lineLine2Detail",
+      "DETECTED!",
+      `C2=${C2.toFixed(2)}A`
+    );
+    activeFaults.push({
+      type: "Line-to-Line Fault (Node 2)",
+      description: `Excessive current at Node 2: ${C2.toFixed(2)}A (Threshold: >2A). Short circuit before Node 2.`,
+      severity: "CRITICAL",
+      values: `C2=${C2.toFixed(2)}A`
+    });
+  }
+  
+  // Fault 5: Insulator Fault at Node 1 (T1 > 35)
+  if (T1 > 35) {
+    setFaultCard(
+      "insulator1Card",
+      "insulator1Status",
+      "insulator1Detail",
+      "DETECTED!",
+      `T1=${T1.toFixed(1)}°C`
+    );
+    activeFaults.push({
+      type: "Insulator Fault (Node 1)",
+      description: `High temperature at Node 1: ${T1.toFixed(1)}°C (Threshold: >35°C). Insulator degradation or failure.`,
+      severity: "HIGH",
+      values: `T1=${T1.toFixed(1)}°C`
+    });
+  }
+  
+  // Fault 6: Insulator Fault at Node 2 (T2 > 35)
+  if (T2 > 35) {
+    setFaultCard(
+      "insulator2Card",
+      "insulator2Status",
+      "insulator2Detail",
+      "DETECTED!",
+      `T2=${T2.toFixed(1)}°C`
+    );
+    activeFaults.push({
+      type: "Insulator Fault (Node 2)",
+      description: `High temperature at Node 2: ${T2.toFixed(1)}°C (Threshold: >35°C). Insulator degradation or failure.`,
+      severity: "HIGH",
+      values: `T2=${T2.toFixed(1)}°C`
+    });
+  }
+  
+  // Display fault details
+  const faultDetails = document.getElementById("faultDetails");
+  const faultDescription = document.getElementById("faultDescription");
+  
+  if (activeFaults.length > 0) {
+    faultDetails.classList.remove("hidden");
+    let detailsHtml = "";
+    activeFaults.forEach(fault => {
+      detailsHtml += `
+        <div class="mb-2 pb-2 border-b border-slate-700 last:border-0">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-bold text-red-300">${fault.type}</span>
+            <span class="text-xs px-2 py-1 rounded ${fault.severity === 'CRITICAL' ? 'bg-red-600' : 'bg-orange-600'} text-white">
+              ${fault.severity}
+            </span>
+          </div>
+          <div class="text-slate-400">${fault.description}</div>
+          <div class="text-xs text-slate-500 mt-1">${fault.values}</div>
+        </div>
+      `;
+    });
+    faultDescription.innerHTML = detailsHtml;
+    
+    activeFaults.forEach(fault => {
+      log(`${fault.type} - ${fault.severity}`, "error");
+    });
+  } else {
+    faultDetails.classList.add("hidden");
+  }
+  
+  return activeFaults.length > 0;
+}
+
+async function pollStatus() {
+  try {
+    const res = await fetch("/status");
+    const data = await res.json();
+
+    detectionCountEl.textContent = data.detections.length;
+
+    frameCount++;
+    const now = Date.now();
+    if (now - lastTime >= 1000) {
+      fpsEl.textContent = frameCount;
+      frameCount = 0;
+      lastTime = now;
+    }
+
+    // Fetch devices data
+    const devicesRes = await fetch("/devices");
+    const devicesData = await devicesRes.json();
+    
+    let node1Found = false;
+    let node2Found = false;
+    
+    if (devicesData.devices) {
+      devicesData.devices.forEach(device => {
+        const deviceId = device.id.toString();
+        const deviceData = device.data;
+        
+        if (deviceId === "0") {
+          node1Found = true;
+          node1Data.current = parseFloat(deviceData.irms) || 0;
+          node1Data.voltage = parseFloat(deviceData.voltage) || 0;
+          node1Data.temp = parseFloat(deviceData.temp) || 0;
+          
+          updateNodeDisplay(1, node1Data.current, node1Data.voltage, node1Data.temp);
+          
+          document.getElementById("node1LastUpdate").textContent = new Date().toLocaleTimeString();
+          document.getElementById("node1Connection").textContent = "CONNECTED";
+          document.getElementById("node1Connection").className = "text-green-400 font-bold";
+        } else if (deviceId === "1") {
+          node2Found = true;
+          node2Data.current = parseFloat(deviceData.irms) || 0;
+          node2Data.voltage = parseFloat(deviceData.voltage) || 0;
+          node2Data.temp = parseFloat(deviceData.temp) || 0;
+          
+          updateNodeDisplay(2, node2Data.current, node2Data.voltage, node2Data.temp);
+          
+          document.getElementById("node2LastUpdate").textContent = new Date().toLocaleTimeString();
+          document.getElementById("node2Connection").textContent = "CONNECTED";
+          document.getElementById("node2Connection").className = "text-green-400 font-bold";
+        }
+      });
+    }
+    
+    // Update connection status for nodes not found
+    if (!node1Found) {
+      document.getElementById("node1Connection").textContent = "WAITING";
+      document.getElementById("node1Connection").className = "text-yellow-400 font-bold";
+    }
+    if (!node2Found) {
+      document.getElementById("node2Connection").textContent = "WAITING";
+      document.getElementById("node2Connection").className = "text-yellow-400 font-bold";
+    }
+
+    // Diagnose faults based on both nodes
+    const hasFault = diagnoseFaults();
+
+    // RED ALERT LOGIC - ONLY FOR WEBCAM DETECTIONS
+    const hasWebcamDetection = data.detections.length > 0;
+    
+    if (hasWebcamDetection && !currentAlertState) {
+      currentAlertState = true;
+
+      systemStatus.textContent = "⚠ CRITICAL FAULT";
+      systemStatus.className = "text-red-500 font-extrabold";
+
+      alertBanner.classList.remove("hidden", "alert-exit");
+      alertBanner.classList.add("alert-enter");
+      
+      alertBanner.innerHTML = `
+        <div class="bg-red-900 border-b-8 border-red-500 p-8 danger-glow">
+          <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+              <div class="text-6xl animate-pulse">🚨</div>
+              <div>
+                <h2 class="text-4xl font-extrabold text-red-100">
+                  FAULT DETECTION ALERT
+                </h2>
+                <p class="text-xl text-red-200 font-bold">
+                  Visual fault detected by AI camera system
+                </p>
+              </div>
+            </div>
+            <div id="alertCountdown"
+                 class="text-6xl font-extrabold text-red-100">10</div>
+          </div>
+        </div>
+      `;
+
+      log("WEBCAM FAULT DETECTED — RED ALERT TRIGGERED", "error");
+
+      let sec = 10;
+      const countdown = document.getElementById("alertCountdown");
+      const interval = setInterval(() => {
+        sec--;
+        countdown.textContent = sec;
+        if (sec <= 0) clearInterval(interval);
+      }, 1000);
+
+      alertTimeout = setTimeout(() => {
+        alertBanner.classList.remove("alert-enter");
+        alertBanner.classList.add("alert-exit");
+
+        setTimeout(() => {
+          alertBanner.classList.add("hidden");
+          alertBanner.classList.remove("alert-exit");
+          currentAlertState = false;
+
+          systemStatus.textContent = "NORMAL";
+          systemStatus.className = "text-green-400 font-bold";
+
+          log("Alert cleared — monitoring resumed", "success");
+        }, 500);
+      }, 10000);
+    }
+
+    // RESULTS CARD - Show both webcam and electrical faults
+    if (!hasWebcamDetection && !hasFault) {
+      resultsCard.className =
+        "bg-slate-900/70 border-2 border-green-500/30 rounded-xl p-5";
+      resultsDiv.innerHTML =
+        `<p class="text-green-400 font-bold">
+           ✔ No faults detected. System operating normally.
+         </p>`;
+    } else {
+      resultsCard.className =
+        "bg-red-900/40 border-4 border-red-500 rounded-xl p-5 danger-glow";
+      
+      let resultHtml = '';
+      
+      if (hasWebcamDetection) {
+        resultHtml += `<p class="text-red-300 font-extrabold text-lg mb-2">
+           ⚠ WEBCAM FAULT DETECTED — Visual inspection required!
+         </p>`;
+      }
+      
+      if (hasFault && activeFaults.length > 0) {
+        resultHtml += `<p class="text-orange-300 font-bold text-md mb-2">
+           ⚡ ${activeFaults.length} Electrical Fault(s):
+         </p>`;
+        resultHtml += '<ul class="list-disc list-inside text-sm text-orange-200">';
+        activeFaults.forEach(fault => {
+          resultHtml += `<li>${fault.type}</li>`;
+        });
+        resultHtml += '</ul>';
+      }
+      
+      resultsDiv.innerHTML = resultHtml;
+    }
+
+  } catch (err) {
+    log("Status polling error: " + err.message, "error");
+  }
+}
+
+setInterval(pollStatus, 500);
+log("Dual Node Monitoring started", "success");
+log("Waiting for Node 1 and Node 2 connections...", "info");
+</script>
+
+</body>
+</html>
